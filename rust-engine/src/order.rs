@@ -6,6 +6,15 @@ pub enum Side {
     Sell,
 }
 
+impl Side {
+    pub fn opposite(self) -> Side {
+        match self {
+            Side::Buy => Side::Sell,
+            Side::Sell => Side::Buy,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Order {
     pub id: OrderId,
@@ -14,6 +23,12 @@ pub struct Order {
     pub quantity: u64,
     pub remaining: u64,
     pub sequence: u64,
+}
+
+impl Order {
+    pub fn fill(&mut self, qty: u64) {
+        self.remaining -= qty;
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
