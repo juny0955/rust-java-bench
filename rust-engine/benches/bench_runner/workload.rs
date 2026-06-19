@@ -8,8 +8,8 @@ pub enum Scenario {
 }
 
 const BASE_PRICE: i64 = 100_000;
-const SWEEP_LEVELS: u64 = 8;
-const SWEEP_MAKER_QTY: u64 = 10;
+const SWEEP_LEVELS: u64 = 1_000;
+const SWEEP_MAKER_QTY: u64 = 1;
 
 #[derive(Debug, Clone, Copy)]
 struct WorstCaseState {
@@ -186,7 +186,7 @@ mod tests {
     fn worst_case_cross_sweeps_multiple_price_levels_with_one_taker() {
         use rust_engine::MatchingEngine;
 
-        let mut generator = WorkloadGenerator::new(Scenario::WorstCaseCross, 99, 1_000);
+        let mut generator = WorkloadGenerator::new(Scenario::WorstCaseCross, 99, 3_003);
         let mut engine = MatchingEngine::new();
         let mut max_trades_for_one_order = 0usize;
         let mut crossed_multiple_prices = false;
