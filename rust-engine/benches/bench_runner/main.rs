@@ -111,7 +111,7 @@ fn mean_stddev(values: &[f64]) -> (f64, f64) {
 
 fn print_row(label: &str, m: &MetricRow) {
     println!(
-        "  {label:7}: ops_sec={:.1} submit_ms={:.1} p50={:.0} p90={:.0} p99={:.0} p999={:.0} max={:.0} samples={:.0} stride={:.0} baseline_rss_kb={} peak_rss_kb={} avg_rss_kb={}",
+        "  {label:7}: ops_sec={:.1} ops/s submit={:.1}ms p50={:.0}ns p90={:.0}ns p99={:.0}ns p999={:.0}ns max={:.0}ns samples={:.0} stride={:.0} baseline_rss={} peak_rss={} avg_rss={}",
         m.ops_sec,
         m.submit_elapsed_ms,
         m.p50_ns,
@@ -121,9 +121,9 @@ fn print_row(label: &str, m: &MetricRow) {
         m.max_ns,
         m.latency_sample_count,
         m.latency_sample_stride,
-        display_optional(m.baseline_rss_kb),
-        display_optional(m.peak_rss_kb),
-        display_optional(m.avg_rss_kb)
+        display_rss_kb(m.baseline_rss_kb),
+        display_rss_kb(m.peak_rss_kb),
+        display_rss_kb(m.avg_rss_kb)
     );
 }
 
@@ -155,9 +155,9 @@ fn csv_optional(value: Option<f64>) -> String {
     value.map(|v| v.to_string()).unwrap_or_default()
 }
 
-fn display_optional(value: Option<f64>) -> String {
+fn display_rss_kb(value: Option<f64>) -> String {
     value
-        .map(|v| format!("{v:.0}"))
+        .map(|v| format!("{v:.0}KB"))
         .unwrap_or_else(|| "NA".to_string())
 }
 
@@ -440,6 +440,12 @@ mod tests {
         let csv = csv_row("Scenario", 10, "run_0", &row);
 
         assert_eq!(csv, "Scenario,10,run_0,1,2,3,4,5,6,7,8,9,,,,false,windows");
+    }
+
+    #[test]
+    fn display_rss_kb_appends_unit_or_na() {
+        assert_eq!(display_rss_kb(Some(12345.0)), "12345KB");
+        assert_eq!(display_rss_kb(None), "NA");
     }
 
     #[test]
