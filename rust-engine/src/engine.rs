@@ -17,7 +17,7 @@ impl MatchingEngine {
         let opposite_side = taker.side.opposite();
 
         while taker.remaining > 0 {
-            let Some((best_price, _)) = self.book.peek_best(opposite_side) else {
+            let Some((best_price, maker)) = self.book.peek_best_mut(opposite_side) else {
                 break;
             };
 
@@ -25,25 +25,23 @@ impl MatchingEngine {
                 break;
             }
 
-            let mut maker = self
-                .book
-                .poll_best(opposite_side)
-                .expect("peek confirmed an order");
             let fill_qty = taker.remaining.min(maker.remaining);
             taker.fill(fill_qty);
             maker.fill(fill_qty);
+            let maker_id = maker.id;
+            let maker_filled = maker.remaining == 0;
 
             self.next_trade_seq += 1;
             trades.push(Trade {
-                maker_order_id: maker.id,
+                maker_order_id: maker_id,
                 taker_order_id: taker.id,
                 price: best_price,
                 quantity: fill_qty,
                 sequence: self.next_trade_seq,
             });
 
-            if maker.remaining > 0 {
-                self.book.push_front(maker);
+            if maker_filled {
+                self.book.poll_best(opposite_side);
             }
         }
 
