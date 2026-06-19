@@ -24,6 +24,16 @@ impl OrderBook {
         queue.front().map(|order| (price, order))
     }
 
+    pub fn peek_best_mut(&mut self, side: Side) -> Option<(i64, &mut Order)> {
+        let map = self.side_map_mut(side);
+        let &price = match side {
+            Side::Buy => map.last_key_value()?.0,
+            Side::Sell => map.first_key_value()?.0,
+        };
+        let queue = map.get_mut(&price)?;
+        queue.front_mut().map(|order| (price, order))
+    }
+
     pub fn poll_best(&mut self, side: Side) -> Option<Order> {
         let map = self.side_map_mut(side);
         let &price = match side {
@@ -37,11 +47,6 @@ impl OrderBook {
             map.remove(&price);
         }
         order
-    }
-
-    pub fn push_front(&mut self, order: Order) {
-        let map = self.side_map_mut(order.side);
-        map.entry(order.price).or_default().push_front(order);
     }
 
     fn best_entry<'a>(
@@ -142,14 +147,17 @@ mod tests {
     }
 
     #[test]
-    fn 부분체결_주문을_앞에_되돌리면_기존_우선순위가_유지된다() {
+    fn peek_best_mut으로_체결하면_제거나_재삽입_없이_우선순위가_유지된다() {
         let mut book = OrderBook::new();
         book.insert(order(1, Side::Sell, 100, 5));
         book.insert(order(2, Side::Sell, 100, 5));
 
-        let mut polled = book.poll_best(Side::Sell).unwrap();
-        polled.remaining = 2;
-        book.push_front(polled);
+        {
+            let (price, best) = book.peek_best_mut(Side::Sell).unwrap();
+            assert_eq!(price, 100);
+            assert_eq!(best.id, 1);
+            best.remaining -= 3;
+        }
 
         let (_, best) = book.peek_best(Side::Sell).unwrap();
         assert_eq!(best.id, 1);

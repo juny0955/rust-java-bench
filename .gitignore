@@ -29,6 +29,7 @@ out/
 bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
+rust-engine/benches/results/
 
 ### NetBeans ###
 /nbproject/private/
