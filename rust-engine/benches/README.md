@@ -28,6 +28,8 @@ cargo run --release --bin bench_runner
 - 레이턴시 pass: 전체 주문 중 일정 간격으로 샘플링해 p50/p90/p99/p999/max를 계산한다.
 - 메모리 pass: 레이턴시 샘플 저장 없이 batch 단위로 RSS를 측정한다. 엔진이 비어 있는 시작 시점의 RSS는 `baseline_rss_kb`로 따로 기록하고, `avg_rss_kb`/`peak_rss_kb`는 batch 처리 **이후**의 적재(loaded) 상태 샘플만으로 계산한다. baseline을 분리하지 않으면 빈 엔진 샘플이 평균을 끌어내린다.
 
+  RSS는 프로세스 전역 값이고 할당자는 해제된 메모리를 OS에 즉시 반환하지 않으므로, 한 프로세스에서 여러 시나리오를 순차 측정하면 이전 시나리오(특히 체결이 없어 호가창이 끝없이 커지는 `ThinBook`)의 잔존 RSS가 다음 시나리오의 baseline을 오염시킨다. 이를 막기 위해 메모리 pass는 `(시나리오, 스케일, run)`마다 **별도 워커 프로세스**(`--mem-worker`로 자기 자신을 재실행)에서 측정한다. 각 워커는 깨끗한 baseline에서 시작하므로 `baseline_rss_kb`가 진짜 "빈 엔진"의 RSS를 반영한다. RSS를 지원하지 않는 OS에서는 워커를 띄우지 않고 RSS 컬럼을 빈 값으로 둔다.
+
 ### 타이머 오버헤드
 
 레이턴시 pass는 샘플마다 `Instant::now()` + `Instant::elapsed()`를 호출하므로, 기록된 레이턴시에는 이 타이머 호출 비용 자체가 포함된다. submit 한 건이 수십 ns 수준이면 이 오버헤드가 무시할 수 없다. runner는 측정 시작 시 `timer_overhead_ns`(샘플당 `now()`+`elapsed()` 평균 비용)를 측정해 stdout에 출력한다. 레이턴시 percentile은 이 값만큼의 고정 오버헤드를 포함한 수치로 읽어야 하며, 엔진 단독 추정치가 필요하면 percentile에서 `timer_overhead_ns`를 빼면 된다. 이 값은 머신·OS에 따라 다르므로(특히 Windows QPC는 ~20–30ns) 매 실행 로그에서 확인한다.
@@ -60,7 +62,13 @@ scenario,scale,row_type,ops_sec,submit_elapsed_ms,p50_ns,p90_ns,p99_ns,p999_ns,m
 이 레포의 목적은 동일 워크로드에서 Rust 엔진과 Java 엔진을 **공정하게** 비교하는 것이다. `java-engine`의 벤치마크 하니스는 (구현 시) 아래 의미론을 이 Rust 하니스와 동일하게 맞춰야 한다. 한쪽만 다르면 비교가 무의미해진다.
 
 - **시나리오·스케일·반복**: 동일한 `ThinBook`/`ActiveFill`/`WorstCaseCross`, 동일한 1,000,000 / 10,000,000 스케일, 동일한 10회 반복.
-- **워크로드 생성**: 동일한 xorshift RNG와 seed 시퀀스로 **바이트 단위 동일한 주문열**을 생성한다. `WorstCaseCross`는 양쪽 모두 seed 무관 결정적 생성이어야 한다.
+- **워크로드 생성**: 동일한 xorshift RNG와 seed 시퀀스로 **바이트 단위 동일한 주문열**을 생성한다. `WorstCaseCross`는 양쪽 모두 seed 무관 결정적 생성이어야 한다. 바이트 단위 동일성은 아래 RNG 호출 순서 계약을 양쪽이 정확히 지킬 때만 성립한다.
+
+  **RNG 호출 순서 계약** (Java 포팅이 가장 어긋나기 쉬운 지점):
+  - **xorshift64**: 상태 `x`에 대해 `x ^= x << 13; x ^= x >> 7; x ^= x << 17` 순으로 갱신하고 갱신 후 값을 반환한다. `seed == 0`이면 상태를 골든레이쇼 상수 `0x9E37_79B9_7F4A_7C15`로 치환해 0 고착을 피한다.
+  - **id 선할당**: 매 주문은 난수를 소비하기 **전에** `id`(= `sequence`)를 먼저 발급한다. `next_id`는 시나리오·체결 여부와 무관하게 **모든 주문마다 1씩** 증가한다.
+  - **난수 소비 순서**: `ThinBook`/`ActiveFill`은 주문당 정확히 3회를 `side → offset(또는 jitter) → qty` 순서로 소비한다. `side`는 난수가 짝수면 `Buy`. `WorstCaseCross`는 난수를 **전혀 소비하지 않으므로** `rng_state`를 건드리지 않는다(`next_id`만 증가).
+  - 따라서 한 워크로드 안에서 `ThinBook`/`ActiveFill`만 `rng_state`를 전진시키고, `WorstCaseCross`는 전진시키지 않는다. Java도 동일하게 맞춰야 같은 seed에서 동일 주문열이 나온다.
 - **3-pass 분리**: throughput / latency / memory를 각각 독립 엔진으로 재생한다. 처리량 측정에서 주문 생성과 레이턴시 기록을 제외하는 규칙도 동일해야 한다.
 - **반환값 처리**: `submit_limit_order`가 반환하는 체결(trade) 컬렉션은 양쪽 모두 **사용하지 않고 폐기**한다. `ActiveFill`/`WorstCaseCross`처럼 체결이 발생하는 시나리오에서 trade 컬렉션 할당·해제 비용이 측정에 포함되는지 여부를 동일하게 맞춘다(현재 Rust는 포함).
 - **워밍업**: 측정 전 워밍업을 수행하고, 워밍업 건수를 스케일에 비례시킨다. 단, JIT가 있는 Java는 정상상태(steady state) 도달에 필요한 워밍업이 Rust보다 훨씬 크므로, "스케일 비례"라는 정책은 공유하되 충분히 데워졌는지는 Java 쪽에서 별도로 검증해야 한다.

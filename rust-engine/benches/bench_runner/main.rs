@@ -15,6 +15,7 @@ const WARMUP_DIVISOR: u64 = 10;
 const REPS: usize = 10;
 const BATCH_SIZE: usize = 100_000;
 const TARGET_LATENCY_SAMPLES: u64 = 100_000;
+const MEM_WORKER_FLAG: &str = "--mem-worker";
 const SCALES: [u64; 2] = [1_000_000, 10_000_000];
 const SCENARIOS: [Scenario; 3] = [
     Scenario::ThinBook,
@@ -207,7 +208,7 @@ fn run_throughput(scenario: Scenario, count: u64, seed: u64) -> Duration {
         submitted += batch.len() as u64;
         let submit_start = Instant::now();
         for order in batch {
-            let _ = engine.submit_limit_order(order);
+            std::hint::black_box(engine.submit_limit_order(order));
         }
         submit_elapsed += submit_start.elapsed();
     }
@@ -281,12 +282,106 @@ fn run_memory(
     (baseline_rss_kb, peak_rss_kb, avg_rss_kb, rss_supported)
 }
 
+type MemResult = (Option<u64>, Option<u64>, Option<u64>, bool);
+
+fn opt_u64_to_str(value: Option<u64>) -> String {
+    value.map(|v| v.to_string()).unwrap_or_default()
+}
+
+fn serialize_mem_result(r: MemResult) -> String {
+    let (baseline, peak, avg, supported) = r;
+    format!(
+        "{},{},{},{}",
+        opt_u64_to_str(baseline),
+        opt_u64_to_str(peak),
+        opt_u64_to_str(avg),
+        supported
+    )
+}
+
+fn parse_mem_result(line: &str) -> MemResult {
+    let fields: Vec<&str> = line.trim().split(',').collect();
+    assert_eq!(
+        fields.len(),
+        4,
+        "memory worker result must have 4 fields, got: {line:?}"
+    );
+    let parse_opt = |s: &str| -> Option<u64> {
+        if s.is_empty() {
+            None
+        } else {
+            Some(s.parse().expect("memory worker: invalid rss field"))
+        }
+    };
+    let supported = match fields[3] {
+        "true" => true,
+        "false" => false,
+        other => panic!("memory worker: invalid supported flag: {other:?}"),
+    };
+    (
+        parse_opt(fields[0]),
+        parse_opt(fields[1]),
+        parse_opt(fields[2]),
+        supported,
+    )
+}
+
+fn parse_scenario(name: &str) -> Scenario {
+    match name {
+        "ThinBook" => Scenario::ThinBook,
+        "ActiveFill" => Scenario::ActiveFill,
+        "WorstCaseCross" => Scenario::WorstCaseCross,
+        other => panic!("unknown scenario: {other:?}"),
+    }
+}
+
+/// Worker entry point: runs only the memory pass in a pristine process and
+/// prints a single serialized result line. Keeping it in its own process means
+/// the baseline RSS is not polluted by allocations the parent retained from
+/// earlier scenarios/reps (the allocator does not return freed pages to the OS).
+fn run_mem_worker(args: &[String]) {
+    let scenario = parse_scenario(&args[0]);
+    let count: u64 = args[1].parse().expect("memory worker: invalid scale");
+    let seed: u64 = args[2].parse().expect("memory worker: invalid seed");
+    let result = run_memory(scenario, count, seed);
+    println!("{}", serialize_mem_result(result));
+}
+
+/// Spawns the memory pass in an isolated worker process so each measurement
+/// starts from a clean baseline. On platforms without RSS support the result is
+/// all-`None`, so we skip the subprocess and return directly.
+fn measure_memory_isolated(scenario: Scenario, count: u64, seed: u64) -> MemResult {
+    if mem::read_rss_kb().is_none() {
+        return (None, None, None, false);
+    }
+
+    let exe = std::env::current_exe().expect("failed to resolve current executable path");
+    let output = std::process::Command::new(exe)
+        .arg(MEM_WORKER_FLAG)
+        .arg(scenario_name(scenario))
+        .arg(count.to_string())
+        .arg(seed.to_string())
+        .output()
+        .expect("failed to spawn memory worker process");
+    assert!(
+        output.status.success(),
+        "memory worker exited with failure: {:?}",
+        output.status
+    );
+    let stdout = String::from_utf8(output.stdout).expect("memory worker stdout was not utf-8");
+    let line = stdout
+        .lines()
+        .next()
+        .expect("memory worker produced no output");
+    parse_mem_result(line)
+}
+
 fn run_once(scenario: Scenario, count: u64, seed: u64) -> RunResult {
     let latency_sample_stride = (count / TARGET_LATENCY_SAMPLES).max(1);
     let submit_elapsed = run_throughput(scenario, count, seed);
     let summary = run_latency(scenario, count, seed, latency_sample_stride);
     let (baseline_rss_kb, peak_rss_kb, avg_rss_kb, rss_supported) =
-        run_memory(scenario, count, seed);
+        measure_memory_isolated(scenario, count, seed);
 
     RunResult {
         ops_sec: count as f64 / submit_elapsed.as_secs_f64(),
@@ -310,6 +405,12 @@ fn main() {
     if cfg!(debug_assertions) {
         eprintln!("bench_runner must be run with --release");
         std::process::exit(1);
+    }
+
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(pos) = args.iter().position(|a| a == MEM_WORKER_FLAG) {
+        run_mem_worker(&args[pos + 1..]);
+        return;
     }
 
     let timer_overhead_ns = measure_timer_overhead_ns();
@@ -446,6 +547,26 @@ mod tests {
     fn display_rss_kb_appends_unit_or_na() {
         assert_eq!(display_rss_kb(Some(12345.0)), "12345KB");
         assert_eq!(display_rss_kb(None), "NA");
+    }
+
+    #[test]
+    fn mem_result_round_trips_through_serialization() {
+        let cases: [MemResult; 3] = [
+            (Some(1024), Some(2048), Some(1536), true),
+            (None, None, None, false),
+            (Some(0), None, Some(42), true),
+        ];
+        for case in cases {
+            let line = serialize_mem_result(case);
+            assert_eq!(parse_mem_result(&line), case);
+        }
+    }
+
+    #[test]
+    fn parse_scenario_round_trips_with_scenario_name() {
+        for s in SCENARIOS {
+            assert_eq!(parse_scenario(scenario_name(s)), s);
+        }
     }
 
     #[test]
