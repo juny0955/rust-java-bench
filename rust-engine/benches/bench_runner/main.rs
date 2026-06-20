@@ -20,7 +20,7 @@ const SCALES: [u64; 2] = [1_000_000, 10_000_000];
 const SCENARIOS: [Scenario; 3] = [
     Scenario::ThinBook,
     Scenario::ActiveFill,
-    Scenario::WorstCaseCross,
+    Scenario::DeepSweepCross,
 ];
 
 struct RunResult {
@@ -166,7 +166,7 @@ fn scenario_name(s: Scenario) -> &'static str {
     match s {
         Scenario::ThinBook => "ThinBook",
         Scenario::ActiveFill => "ActiveFill",
-        Scenario::WorstCaseCross => "WorstCaseCross",
+        Scenario::DeepSweepCross => "DeepSweepCross",
     }
 }
 
@@ -330,7 +330,7 @@ fn parse_scenario(name: &str) -> Scenario {
     match name {
         "ThinBook" => Scenario::ThinBook,
         "ActiveFill" => Scenario::ActiveFill,
-        "WorstCaseCross" => Scenario::WorstCaseCross,
+        "DeepSweepCross" | "WorstCaseCross" => Scenario::DeepSweepCross,
         other => panic!("unknown scenario: {other:?}"),
     }
 }
@@ -567,6 +567,17 @@ mod tests {
         for s in SCENARIOS {
             assert_eq!(parse_scenario(scenario_name(s)), s);
         }
+    }
+
+    #[test]
+    fn scenario_name_emits_deep_sweep_cross_when_sweep_workload_selected() {
+        assert_eq!(scenario_name(Scenario::DeepSweepCross), "DeepSweepCross");
+    }
+
+    #[test]
+    fn parse_scenario_accepts_deep_sweep_cross_and_legacy_worst_case_cross_alias() {
+        assert_eq!(parse_scenario("DeepSweepCross"), Scenario::DeepSweepCross);
+        assert_eq!(parse_scenario("WorstCaseCross"), Scenario::DeepSweepCross);
     }
 
     #[test]

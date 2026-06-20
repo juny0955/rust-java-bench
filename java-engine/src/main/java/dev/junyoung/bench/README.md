@@ -23,8 +23,9 @@ JIT가 켜져 있어야 한다(`-Xint` 감지 시 즉시 실패). Gradle `JavaEx
 
 - `ThinBook`: 기준가에서 먼 주문으로 체결보다 호가창 삽입/조회 비용을 본다.
 - `ActiveFill`: 기준가 근처 주문으로 체결과 대기가 섞이는 활성 장세를 본다.
-- `WorstCaseCross`: 여러 가격대 maker를 쌓고 하나의 큰 taker가 sweep하게 만들어 매칭 루프를 본다.
+- `DeepSweepCross`: 여러 가격대 maker를 쌓고 하나의 큰 taker가 sweep하게 만들어 매칭 루프를 본다.
   **seed를 사용하지 않는 완전 결정적** 워크로드다.
+  기존 결과/스크립트 호환을 위해 입력 label `WorstCaseCross`도 같은 시나리오로 파싱한다.
 
 각 시나리오는 1,000,000 / 10,000,000 스케일에서 10회 반복하며, 측정 전 스케일 비례
 (`max(scale/10, 10,000)`) 워밍업 pass를 수행한다. 고정 1-pass 워밍업으로는 JVM JIT가 C2까지

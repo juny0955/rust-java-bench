@@ -89,10 +89,18 @@ class WorkloadGeneratorTest {
     }
 
     @Test
-    @DisplayName("WorstCaseCross 주요 인덱스(maker/taker/방향전환)가 Rust 골든값과 일치한다")
-    void worstCaseCrossMatchesRustGoldenAtKeyIndices() {
+    @DisplayName("DeepSweepCross label과 legacy parse alias를 지원한다")
+    void deepSweepCrossLabelAndLegacyAlias() {
+        assertEquals("DeepSweepCross", Scenario.DEEP_SWEEP_CROSS.label());
+        assertEquals(Scenario.DEEP_SWEEP_CROSS, Scenario.fromLabel("DeepSweepCross"));
+        assertEquals(Scenario.DEEP_SWEEP_CROSS, Scenario.fromLabel("WorstCaseCross"));
+    }
+
+    @Test
+    @DisplayName("DeepSweepCross 주요 인덱스(maker/taker/방향전환)가 Rust 골든값과 일치한다")
+    void deepSweepCrossMatchesRustGoldenAtKeyIndices() {
         long count = 2003;
-        List<Order> orders = collectAll(Scenario.WORST_CASE_CROSS, 7, count, 4096);
+        List<Order> orders = collectAll(Scenario.DEEP_SWEEP_CROSS, 7, count, 4096);
         assertEquals(count, orders.size());
 
         assertMatches(orders.get(0), new Row(1, "SELL", 100000, 1));
@@ -112,7 +120,7 @@ class WorkloadGeneratorTest {
     @Test
     @DisplayName("같은 seed면 배치 크기와 무관하게 동일한 주문열을 생성한다")
     void sameSeedSameSequenceRegardlessOfBatchSize() {
-        for (Scenario scenario : new Scenario[] {Scenario.THIN_BOOK, Scenario.WORST_CASE_CROSS}) {
+        for (Scenario scenario : new Scenario[] {Scenario.THIN_BOOK, Scenario.DEEP_SWEEP_CROSS}) {
             List<Order> small = collectAll(scenario, 123, 10_000, 1_000);
             List<Order> large = collectAll(scenario, 123, 10_000, 100_000);
             assertEquals(small.size(), large.size());
@@ -141,9 +149,9 @@ class WorkloadGeneratorTest {
     }
 
     @Test
-    @DisplayName("WorstCaseCross의 단일 taker가 여러 가격대를 sweep한다")
-    void worstCaseCrossSweepsMultiplePriceLevels() {
-        WorkloadGenerator g = new WorkloadGenerator(Scenario.WORST_CASE_CROSS, 99, 3_003);
+    @DisplayName("DeepSweepCross의 단일 taker가 여러 가격대를 sweep한다")
+    void deepSweepCrossSweepsMultiplePriceLevels() {
+        WorkloadGenerator g = new WorkloadGenerator(Scenario.DEEP_SWEEP_CROSS, 99, 3_003);
         MatchingEngine engine = new MatchingEngine();
         int maxTradesForOneOrder = 0;
         boolean crossedMultiplePrices = false;

@@ -70,7 +70,7 @@ public final class WorkloadGenerator {
         Order order = switch (scenario) {
             case THIN_BOOK -> nextThinBookOrder();
             case ACTIVE_FILL -> nextActiveFillOrder();
-            case WORST_CASE_CROSS -> nextWorstCaseOrder();
+            case DEEP_SWEEP_CROSS -> nextDeepSweepCrossOrder();
         };
         totalEmitted += 1;
         return order;
@@ -102,10 +102,10 @@ public final class WorkloadGenerator {
     }
 
     /**
-     * WorstCaseCross. 난수를 전혀 소비하지 않는 완전 결정적 워크로드(nextId만 증가).
+     * DeepSweepCross. 난수를 전혀 소비하지 않는 완전 결정적 워크로드(nextId만 증가).
      * {@code cyclePos}는 {@code totalEmitted}(생성 직후 증가 전, 현재 주문의 0-based 인덱스)로 계산한다.
      */
-    private Order nextWorstCaseOrder() {
+    private Order nextDeepSweepCrossOrder() {
         long id = allocId();
         long cyclePos = totalEmitted % (SWEEP_LEVELS + 1);
         Side makerSide = crossMakerSide;

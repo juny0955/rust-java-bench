@@ -8,7 +8,7 @@ package dev.junyoung.bench;
 public enum Scenario {
     THIN_BOOK("ThinBook"),
     ACTIVE_FILL("ActiveFill"),
-    WORST_CASE_CROSS("WorstCaseCross");
+    DEEP_SWEEP_CROSS("DeepSweepCross");
 
     private final String label;
 
@@ -22,6 +22,9 @@ public enum Scenario {
 
     /** Rust {@code parse_scenario}에 대응. 표기 문자열로 시나리오를 되돌린다. */
     public static Scenario fromLabel(String label) {
+        if ("WorstCaseCross".equals(label)) {
+            return DEEP_SWEEP_CROSS;
+        }
         for (Scenario s : values()) {
             if (s.label.equals(label)) {
                 return s;

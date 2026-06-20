@@ -4,7 +4,7 @@ use rust_engine::{Order, Side};
 pub enum Scenario {
     ThinBook,
     ActiveFill,
-    WorstCaseCross,
+    DeepSweepCross,
 }
 
 const BASE_PRICE: i64 = 100_000;
@@ -12,7 +12,7 @@ const SWEEP_LEVELS: u64 = 1_000;
 const SWEEP_MAKER_QTY: u64 = 1;
 
 #[derive(Debug, Clone, Copy)]
-struct WorstCaseState {
+struct DeepSweepState {
     maker_side: Side,
 }
 
@@ -22,7 +22,7 @@ pub struct WorkloadGenerator {
     next_id: u64,
     total_emitted: u64,
     count: u64,
-    cross_state: WorstCaseState,
+    cross_state: DeepSweepState,
 }
 
 impl WorkloadGenerator {
@@ -37,7 +37,7 @@ impl WorkloadGenerator {
             next_id: 1,
             total_emitted: 0,
             count,
-            cross_state: WorstCaseState {
+            cross_state: DeepSweepState {
                 maker_side: Side::Sell,
             },
         }
@@ -70,7 +70,7 @@ impl WorkloadGenerator {
         let order = match self.scenario {
             Scenario::ThinBook => self.next_thin_book_order(),
             Scenario::ActiveFill => self.next_active_fill_order(),
-            Scenario::WorstCaseCross => self.next_worst_case_order(),
+            Scenario::DeepSweepCross => self.next_deep_sweep_order(),
         };
         self.total_emitted += 1;
         order
@@ -111,7 +111,7 @@ impl WorkloadGenerator {
         order(id, side, price, qty)
     }
 
-    fn next_worst_case_order(&mut self) -> Order {
+    fn next_deep_sweep_order(&mut self) -> Order {
         let id = self.alloc_id();
         let cycle_pos = self.total_emitted % (SWEEP_LEVELS + 1);
         let maker_side = self.cross_state.maker_side;
@@ -177,16 +177,16 @@ mod tests {
         let large_batches = collect_all(Scenario::ThinBook, 123, 10_000, 100_000);
         assert_eq!(small_batches, large_batches);
 
-        let small_batches = collect_all(Scenario::WorstCaseCross, 7, 10_000, 1_000);
-        let large_batches = collect_all(Scenario::WorstCaseCross, 7, 10_000, 100_000);
+        let small_batches = collect_all(Scenario::DeepSweepCross, 7, 10_000, 1_000);
+        let large_batches = collect_all(Scenario::DeepSweepCross, 7, 10_000, 100_000);
         assert_eq!(small_batches, large_batches);
     }
 
     #[test]
-    fn worst_case_cross_sweeps_multiple_price_levels_with_one_taker() {
+    fn deep_sweep_cross_sweeps_multiple_price_levels_with_one_taker() {
         use rust_engine::MatchingEngine;
 
-        let mut generator = WorkloadGenerator::new(Scenario::WorstCaseCross, 99, 3_003);
+        let mut generator = WorkloadGenerator::new(Scenario::DeepSweepCross, 99, 3_003);
         let mut engine = MatchingEngine::new();
         let mut max_trades_for_one_order = 0usize;
         let mut crossed_multiple_prices = false;
