@@ -4,6 +4,7 @@ import dev.junyoung.MatchingEngine;
 import dev.junyoung.Order;
 import dev.junyoung.bench.JvmDiagnostics.Snapshot;
 import java.io.IOException;
+import java.lang.management.CompilationMXBean;
 import java.lang.management.ManagementFactory;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -28,6 +29,9 @@ import java.util.function.ToDoubleFunction;
 public final class BenchRunner {
     private static final long WARMUP_MIN = 10_000;
     private static final long WARMUP_DIVISOR = 10;
+    private static final int MAX_WARMUP_PASSES = 10;
+    private static final int STABLE_STREAK = 2;
+    private static final long POST_WARMUP_SLEEP_MS = 150;
     private static final int REPS = 10;
     private static final int BATCH_SIZE = 100_000;
     private static final long TARGET_LATENCY_SAMPLES = 100_000;
@@ -95,7 +99,45 @@ public final class BenchRunner {
         return (double) elapsed / TIMER_ITERS;
     }
 
+    /**
+     * JIT 컴파일 시간 델타가 연속 {@link #STABLE_STREAK}회 0ms로 안정화될 때까지(최대
+     * {@link #MAX_WARMUP_PASSES}패스) warmup pass를 반복한다. 고정 1-pass warmup은 C2까지
+     * 도달하지 못해 측정 초반(run_0/run_1) ops_sec이 낮고 불안정해지는 문제가 있었다.
+     */
     private static void runWarmup(Scenario scenario, long warmupCount) {
+        CompilationMXBean compilation = ManagementFactory.getCompilationMXBean();
+        boolean jitTrackable = compilation != null && compilation.isCompilationTimeMonitoringSupported();
+
+        int passes = 0;
+        int stableStreak = 0;
+        long prevCompileMs = jitTrackable ? compilation.getTotalCompilationTime() : 0;
+        while (passes < MAX_WARMUP_PASSES) {
+            runWarmupPass(scenario, warmupCount);
+            passes++;
+            if (!jitTrackable) {
+                continue;
+            }
+            long compileMs = compilation.getTotalCompilationTime();
+            long delta = compileMs - prevCompileMs;
+            prevCompileMs = compileMs;
+            stableStreak = (delta == 0) ? stableStreak + 1 : 0;
+            if (stableStreak >= STABLE_STREAK) {
+                break;
+            }
+        }
+
+        try {
+            Thread.sleep(POST_WARMUP_SLEEP_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        System.out.printf(
+                "warmup passes: %d (%s, +%dms settle)%n",
+                passes, stableStreak >= STABLE_STREAK ? "stabilized" : "max reached", POST_WARMUP_SLEEP_MS);
+    }
+
+    private static void runWarmupPass(Scenario scenario, long warmupCount) {
         MatchingEngine engine = new MatchingEngine();
         WorkloadGenerator gen = new WorkloadGenerator(scenario, 0xDEAD_BEEFL, warmupCount);
         while (!gen.isExhausted()) {
