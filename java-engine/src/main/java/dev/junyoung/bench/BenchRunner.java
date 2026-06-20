@@ -103,6 +103,10 @@ public final class BenchRunner {
      * JIT 컴파일 시간 델타가 연속 {@link #STABLE_STREAK}회 0ms로 안정화될 때까지(최대
      * {@link #MAX_WARMUP_PASSES}패스) warmup pass를 반복한다. 고정 1-pass warmup은 C2까지
      * 도달하지 못해 측정 초반(run_0/run_1) ops_sec이 낮고 불안정해지는 문제가 있었다.
+     *
+     * <p>각 pass는 엔진 submit뿐 아니라 {@code runOnce}가 실제로 타는 레이턴시 기록·진단 래퍼
+     * 코드 경로까지 동일하게 실행한다(RSS 서브프로세스 측정은 제외). 단순 submit 루프만 워밍업하면
+     * 그 두 코드 경로가 {@code run_0}에서 처음 실행되어 그때 비로소 JIT 컴파일되는 문제가 있었다.
      */
     private static void runWarmup(Scenario scenario, long warmupCount) {
         CompilationMXBean compilation = ManagementFactory.getCompilationMXBean();
@@ -138,13 +142,9 @@ public final class BenchRunner {
     }
 
     private static void runWarmupPass(Scenario scenario, long warmupCount) {
-        MatchingEngine engine = new MatchingEngine();
-        WorkloadGenerator gen = new WorkloadGenerator(scenario, 0xDEAD_BEEFL, warmupCount);
-        while (!gen.isExhausted()) {
-            for (Order order : gen.nextBatch(BATCH_SIZE)) {
-                engine.submitLimitOrder(order);
-            }
-        }
+        runThroughput(scenario, warmupCount, 0xDEAD_BEEFL, new JvmDiagnostics());
+        long stride = Math.max(warmupCount / TARGET_LATENCY_SAMPLES, 1);
+        runLatency(scenario, warmupCount, 0xDEAD_BEEFL, stride);
     }
 
     /**
