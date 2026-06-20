@@ -1,6 +1,7 @@
 target/
 .omc
 .claude
+.omo
 
 .gradle
 build/
