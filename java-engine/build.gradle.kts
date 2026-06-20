@@ -24,3 +24,11 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+// rust-engine의 `cargo run --release --bin bench_runner`에 대응하는 벤치 실행 태스크.
+tasks.register<JavaExec>("bench") {
+    group = "benchmark"
+    description = "매칭 엔진 벤치마크 하니스 실행 (결과 CSV: build/bench-results/)"
+    mainClass = "dev.junyoung.bench.BenchRunner"
+    classpath = sourceSets["main"].runtimeClasspath
+}
