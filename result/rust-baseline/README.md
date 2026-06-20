@@ -1,9 +1,9 @@
-# Rust 엔진 벤치마크 결과
+# Rust 엔진 기준선
 
 측정일: 2026-06-20
-실행 환경: 루트 [`README.md`](../README.md#실행-환경) 기준 (OCI, aarch64 Neoverse-N1, 2 vCPU, Ubuntu 24.04.4 LTS, 커널 6.17.0-1016-oracle)
+실행 환경: 루트 [`README.md`](../../README.md#실행-환경) 기준 (OCI, aarch64 Neoverse-N1, 2 vCPU, Ubuntu 24.04.4 LTS, 커널 6.17.0-1016-oracle)
 실행 명령: `cargo run --release --bin bench_runner` (`rust-engine/`)
-측정 방식/CSV 컬럼 정의: [`rust-engine/benches/README.md`](../rust-engine/benches/README.md)
+측정 방식/CSV 컬럼 정의: [`rust-engine/benches/README.md`](../../rust-engine/benches/README.md)
 
 ## 요약 (mean ± stddev, n=10)
 
@@ -16,7 +16,7 @@
 | WorstCaseCross | 1,000,000 | 3,897,419 ± 10,080 | 120ns | 200ns | 280ns | 31,776ns ± 21,141ns | 213,393ns | 6,834KB ± 3KB | 6,362KB ± 3KB |
 | WorstCaseCross | 10,000,000 | 3,893,413 ± 26,758 | 120ns | 200ns | 304ns ± 32ns | 25,932ns ± 3,296ns | 124,609ns | 6,864KB ± 6KB | 6,803KB ± 6KB |
 
-원본 CSV: [`1781925291.csv`](./1781925291.csv) (측정 인스턴스의 `rust-engine/target/bench-results/1781925291.csv`에서 가져옴)
+원본 CSV: [`raw.csv`](./raw.csv) (측정 인스턴스의 `rust-engine/target/bench-results/1781925291.csv`에서 가져옴)
 
 ## 관찰
 
@@ -29,4 +29,4 @@
 
 ## 참고
 
-- 본 결과는 Rust 엔진 단독 베이스라인이며, Java 엔진 하니스 구현 후 동일 환경에서 재측정해 비교할 예정.
+- 본 결과는 Java 개선 이력의 기준선이다. Java 결과는 [`../java/`](../java/) 아래에 버전별로 누적한다.
