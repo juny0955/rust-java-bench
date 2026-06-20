@@ -462,6 +462,24 @@ public final class BenchRunner {
 
         guardJitEnabled();
 
+        String scenarioArg = parseArgValue(argList, "--scenario=");
+        String scaleArg = parseArgValue(argList, "--scale=");
+        if (scaleArg != null && scenarioArg == null) {
+            System.err.println("--scale requires --scenario to also be specified");
+            System.exit(1);
+            return;
+        }
+        Scenario[] scenarios;
+        long[] scales;
+        try {
+            scenarios = selectScenarios(scenarioArg);
+            scales = selectScales(scaleArg);
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+            return;
+        }
+
         double timerOverheadNs = measureTimerOverheadNs();
         System.out.printf(
                 "timer_overhead_ns (System.nanoTime x2 per latency sample): %.1f%n", timerOverheadNs);
@@ -473,8 +491,8 @@ public final class BenchRunner {
         List<String> csvRows = new ArrayList<>();
         csvRows.add(csvHeader());
 
-        for (Scenario scenario : SCENARIOS) {
-            for (long scale : SCALES) {
+        for (Scenario scenario : scenarios) {
+            for (long scale : scales) {
                 System.out.printf("== %s / %d ==%n", scenario.label(), scale);
                 runWarmup(scenario, warmupCountFor(scale));
 
