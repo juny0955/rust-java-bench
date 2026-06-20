@@ -13,6 +13,7 @@ Rust를 기준선으로 고정하고, Java 구현을 개선하면서 Rust 처리
 | 버전 | 결과 | 원본 CSV | 요약 |
 | --- | --- | --- | --- |
 | v0-initial | [`java/v0-initial`](./java/v0-initial/) | [`raw.csv`](./java/v0-initial/raw.csv) | Java 초기 포팅 결과 |
+| v1-adaptive-warmup | [`java/v1-adaptive-warmup`](./java/v1-adaptive-warmup/) | [`raw.csv`](./java/v1-adaptive-warmup/raw.csv) | 적응형 warmup으로 JIT 안정화 후 측정 |
 
 ## Rust 기준 Java 근접도
 
@@ -21,6 +22,7 @@ Rust를 기준선으로 고정하고, Java 구현을 개선하면서 Rust 처리
 | Java 버전 | ThinBook 1M | ThinBook 10M | ActiveFill 1M | ActiveFill 10M | WorstCaseCross 1M | WorstCaseCross 10M |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | v0-initial | 57% | 49% | 85% | 69% | 86% | 112% |
+| v1-adaptive-warmup | 61% | 47% | 82% | 73% | 103% | 109% |
 
 ## 해석 기준
 
