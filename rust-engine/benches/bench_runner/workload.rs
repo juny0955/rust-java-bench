@@ -5,6 +5,7 @@ pub enum Scenario {
     ThinBook,
     ActiveFill,
     DeepSweepCross,
+    BookGrowthWorst,
 }
 
 const BASE_PRICE: i64 = 100_000;
@@ -71,6 +72,7 @@ impl WorkloadGenerator {
             Scenario::ThinBook => self.next_thin_book_order(),
             Scenario::ActiveFill => self.next_active_fill_order(),
             Scenario::DeepSweepCross => self.next_deep_sweep_order(),
+            Scenario::BookGrowthWorst => self.next_book_growth_worst_order(),
         };
         self.total_emitted += 1;
         order
@@ -132,6 +134,21 @@ impl WorkloadGenerator {
             Side::Sell => BASE_PRICE - SWEEP_LEVELS as i64,
         };
         order(id, taker_side, price, SWEEP_LEVELS * SWEEP_MAKER_QTY)
+    }
+
+    fn next_book_growth_worst_order(&mut self) -> Order {
+        let id = self.alloc_id();
+        let level = (self.total_emitted / 2 + 1) as i64;
+        let side = if self.total_emitted.is_multiple_of(2) {
+            Side::Buy
+        } else {
+            Side::Sell
+        };
+        let price = match side {
+            Side::Buy => BASE_PRICE - level,
+            Side::Sell => BASE_PRICE + level,
+        };
+        order(id, side, price, 1)
     }
 }
 
@@ -207,5 +224,38 @@ mod tests {
             "expected a sweep taker to generate many trades, got {max_trades_for_one_order}"
         );
         assert!(crossed_multiple_prices);
+    }
+
+    #[test]
+    fn book_growth_worst_emits_seed_independent_non_crossing_unique_levels() {
+        use rust_engine::MatchingEngine;
+
+        let mut generator = WorkloadGenerator::new(Scenario::BookGrowthWorst, 123, 6);
+        let initial_rng_state = generator.rng_state;
+        let first_batch = generator.next_batch(6);
+        let orders = collect_all(Scenario::BookGrowthWorst, 123, 6, 2);
+        let other_seed_orders = collect_all(Scenario::BookGrowthWorst, 999, 6, 64);
+        let mut engine = MatchingEngine::new();
+
+        assert_eq!(generator.rng_state, initial_rng_state);
+        assert_eq!(first_batch, orders);
+        assert_eq!(orders, other_seed_orders);
+        assert_eq!(
+            orders
+                .iter()
+                .map(|o| (o.side, o.price, o.quantity))
+                .collect::<Vec<_>>(),
+            vec![
+                (Side::Buy, BASE_PRICE - 1, 1),
+                (Side::Sell, BASE_PRICE + 1, 1),
+                (Side::Buy, BASE_PRICE - 2, 1),
+                (Side::Sell, BASE_PRICE + 2, 1),
+                (Side::Buy, BASE_PRICE - 3, 1),
+                (Side::Sell, BASE_PRICE + 3, 1),
+            ]
+        );
+        for order in orders {
+            assert!(engine.submit_limit_order(order).is_empty());
+        }
     }
 }

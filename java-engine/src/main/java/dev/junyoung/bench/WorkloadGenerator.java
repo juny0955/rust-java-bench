@@ -71,6 +71,7 @@ public final class WorkloadGenerator {
             case THIN_BOOK -> nextThinBookOrder();
             case ACTIVE_FILL -> nextActiveFillOrder();
             case DEEP_SWEEP_CROSS -> nextDeepSweepCrossOrder();
+            case BOOK_GROWTH_WORST -> nextBookGrowthWorstOrder();
         };
         totalEmitted += 1;
         return order;
@@ -99,6 +100,14 @@ public final class WorkloadGenerator {
         long price = BASE_PRICE + jitter;
         long qty = 10 + Long.remainderUnsigned(nextRand(), 90);
         return order(id, side, price, qty);
+    }
+
+    private Order nextBookGrowthWorstOrder() {
+        long id = allocId();
+        long level = (totalEmitted / 2) + 1;
+        Side side = (totalEmitted & 1L) == 0 ? Side.BUY : Side.SELL;
+        long price = (side == Side.BUY) ? BASE_PRICE - level : BASE_PRICE + level;
+        return order(id, side, price, 1);
     }
 
     /**

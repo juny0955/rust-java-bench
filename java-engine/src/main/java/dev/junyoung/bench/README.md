@@ -21,11 +21,14 @@ JIT가 켜져 있어야 한다(`-Xint` 감지 시 즉시 실패). Gradle `JavaEx
 
 `rust-engine`과 동일하다.
 
-- `ThinBook`: 기준가에서 먼 주문으로 체결보다 호가창 삽입/조회 비용을 본다.
+- `ThinBook`: 기준가에서 먼 bounded-range 주문으로 체결보다 제한된 범위의 resting-book 삽입/조회 압력을 본다.
 - `ActiveFill`: 기준가 근처 주문으로 체결과 대기가 섞이는 활성 장세를 본다.
 - `DeepSweepCross`: 여러 가격대 maker를 쌓고 하나의 큰 taker가 sweep하게 만들어 매칭 루프를 본다.
   **seed를 사용하지 않는 완전 결정적** 워크로드다.
   기존 결과/스크립트 호환을 위해 입력 label `WorstCaseCross`도 같은 시나리오로 파싱한다.
+- `BookGrowthWorst`: 기준가 아래 buy와 기준가 위 sell을 교대로 고유 가격대에 쌓아 가격 레벨/tree를 계속
+  키우는 memory-pressure worst case를 본다. **seed를 사용하지 않는 완전 결정적** 워크로드이며 체결되지
+  않는다.
 
 각 시나리오는 1,000,000 / 10,000,000 스케일에서 10회 반복하며, 측정 전 스케일 비례
 (`max(scale/10, 10,000)`) 워밍업 pass를 수행한다. 고정 1-pass 워밍업으로는 JVM JIT가 C2까지

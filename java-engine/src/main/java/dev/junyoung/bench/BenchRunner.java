@@ -39,7 +39,7 @@ public final class BenchRunner {
     private static final String MEM_WORKER_FLAG = "--mem-worker";
     private static final long[] SCALES = {1_000_000L, 10_000_000L};
     private static final Scenario[] SCENARIOS = {
-        Scenario.THIN_BOOK, Scenario.ACTIVE_FILL, Scenario.DEEP_SWEEP_CROSS
+        Scenario.THIN_BOOK, Scenario.ACTIVE_FILL, Scenario.DEEP_SWEEP_CROSS, Scenario.BOOK_GROWTH_WORST
     };
     private static final String CSV_HEADER =
             "scenario,scale,row_type,ops_sec,submit_elapsed_ms,p50_ns,p90_ns,p99_ns,p999_ns,max_ns,"

@@ -8,7 +8,8 @@ package dev.junyoung.bench;
 public enum Scenario {
     THIN_BOOK("ThinBook"),
     ACTIVE_FILL("ActiveFill"),
-    DEEP_SWEEP_CROSS("DeepSweepCross");
+    DEEP_SWEEP_CROSS("DeepSweepCross"),
+    BOOK_GROWTH_WORST("BookGrowthWorst");
 
     private final String label;
 

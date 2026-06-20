@@ -17,10 +17,11 @@ const BATCH_SIZE: usize = 100_000;
 const TARGET_LATENCY_SAMPLES: u64 = 100_000;
 const MEM_WORKER_FLAG: &str = "--mem-worker";
 const SCALES: [u64; 2] = [1_000_000, 10_000_000];
-const SCENARIOS: [Scenario; 3] = [
+const SCENARIOS: [Scenario; 4] = [
     Scenario::ThinBook,
     Scenario::ActiveFill,
     Scenario::DeepSweepCross,
+    Scenario::BookGrowthWorst,
 ];
 
 struct RunResult {
@@ -167,6 +168,7 @@ fn scenario_name(s: Scenario) -> &'static str {
         Scenario::ThinBook => "ThinBook",
         Scenario::ActiveFill => "ActiveFill",
         Scenario::DeepSweepCross => "DeepSweepCross",
+        Scenario::BookGrowthWorst => "BookGrowthWorst",
     }
 }
 
@@ -331,6 +333,7 @@ fn parse_scenario(name: &str) -> Scenario {
         "ThinBook" => Scenario::ThinBook,
         "ActiveFill" => Scenario::ActiveFill,
         "DeepSweepCross" | "WorstCaseCross" => Scenario::DeepSweepCross,
+        "BookGrowthWorst" => Scenario::BookGrowthWorst,
         other => panic!("unknown scenario: {other:?}"),
     }
 }
@@ -575,9 +578,19 @@ mod tests {
     }
 
     #[test]
+    fn scenario_name_emits_book_growth_worst_when_growth_workload_selected() {
+        assert_eq!(scenario_name(Scenario::BookGrowthWorst), "BookGrowthWorst");
+    }
+
+    #[test]
     fn parse_scenario_accepts_deep_sweep_cross_and_legacy_worst_case_cross_alias() {
         assert_eq!(parse_scenario("DeepSweepCross"), Scenario::DeepSweepCross);
         assert_eq!(parse_scenario("WorstCaseCross"), Scenario::DeepSweepCross);
+    }
+
+    #[test]
+    fn parse_scenario_accepts_book_growth_worst() {
+        assert_eq!(parse_scenario("BookGrowthWorst"), Scenario::BookGrowthWorst);
     }
 
     #[test]
