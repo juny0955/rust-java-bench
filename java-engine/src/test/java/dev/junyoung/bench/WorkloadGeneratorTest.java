@@ -9,7 +9,9 @@ import dev.junyoung.Order;
 import dev.junyoung.Side;
 import dev.junyoung.Trade;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -89,10 +91,72 @@ class WorkloadGeneratorTest {
     }
 
     @Test
-    @DisplayName("WorstCaseCross 주요 인덱스(maker/taker/방향전환)가 Rust 골든값과 일치한다")
-    void worstCaseCrossMatchesRustGoldenAtKeyIndices() {
+    @DisplayName("DeepSweepCross label과 legacy parse alias를 지원한다")
+    void deepSweepCrossLabelAndLegacyAlias() {
+        assertEquals("DeepSweepCross", Scenario.DEEP_SWEEP_CROSS.label());
+        assertEquals(Scenario.DEEP_SWEEP_CROSS, Scenario.fromLabel("DeepSweepCross"));
+        assertEquals(Scenario.DEEP_SWEEP_CROSS, Scenario.fromLabel("WorstCaseCross"));
+    }
+
+    @Test
+    @DisplayName("BookGrowthWorst label과 Rust 규칙 주문열을 지원한다")
+    void bookGrowthWorstLabelAndRustRuleSequence() {
+        Scenario scenario = Scenario.fromLabel("BookGrowthWorst");
+        assertEquals("BookGrowthWorst", scenario.label());
+
+        Row[] expected = {
+            new Row(1, "BUY", 99999, 1),
+            new Row(2, "SELL", 100001, 1),
+            new Row(3, "BUY", 99998, 1),
+            new Row(4, "SELL", 100002, 1),
+            new Row(5, "BUY", 99997, 1),
+            new Row(6, "SELL", 100003, 1),
+        };
+        List<Order> orders = collectAll(scenario, 123, expected.length, 3);
+        assertEquals(expected.length, orders.size());
+        for (int i = 0; i < expected.length; i++) {
+            assertMatches(orders.get(i), expected[i]);
+        }
+    }
+
+    @Test
+    @DisplayName("BookGrowthWorst는 seed와 무관하고 모든 주문이 미체결로 book을 키운다")
+    void bookGrowthWorstIsSeedIndependentAndNeverCrosses() {
+        Scenario scenario = Scenario.fromLabel("BookGrowthWorst");
+        List<Order> seedA = collectAll(scenario, 1, 256, 17);
+        List<Order> seedB = collectAll(scenario, 987654321, 256, 64);
+        MatchingEngine engine = new MatchingEngine();
+        Set<Long> buyPrices = new HashSet<>();
+        Set<Long> sellPrices = new HashSet<>();
+
+        assertEquals(seedA.size(), seedB.size());
+        for (int i = 0; i < seedA.size(); i++) {
+            Order a = seedA.get(i);
+            Order b = seedB.get(i);
+            assertEquals(a.id, b.id);
+            assertEquals(a.side, b.side);
+            assertEquals(a.price, b.price);
+            assertEquals(1, a.quantity);
+            assertEquals(a.remaining, b.remaining);
+            assertEquals(a.sequence, b.sequence);
+            assertTrue(engine.submitLimitOrder(a).isEmpty(), "BookGrowthWorst must never cross at index " + i);
+            if (a.side == Side.BUY) {
+                assertTrue(a.price < 100_000);
+                assertTrue(buyPrices.add(a.price), "duplicate buy price " + a.price);
+            } else {
+                assertTrue(a.price > 100_000);
+                assertTrue(sellPrices.add(a.price), "duplicate sell price " + a.price);
+            }
+        }
+        assertEquals(128, buyPrices.size());
+        assertEquals(128, sellPrices.size());
+    }
+
+    @Test
+    @DisplayName("DeepSweepCross 주요 인덱스(maker/taker/방향전환)가 Rust 골든값과 일치한다")
+    void deepSweepCrossMatchesRustGoldenAtKeyIndices() {
         long count = 2003;
-        List<Order> orders = collectAll(Scenario.WORST_CASE_CROSS, 7, count, 4096);
+        List<Order> orders = collectAll(Scenario.DEEP_SWEEP_CROSS, 7, count, 4096);
         assertEquals(count, orders.size());
 
         assertMatches(orders.get(0), new Row(1, "SELL", 100000, 1));
@@ -112,7 +176,7 @@ class WorkloadGeneratorTest {
     @Test
     @DisplayName("같은 seed면 배치 크기와 무관하게 동일한 주문열을 생성한다")
     void sameSeedSameSequenceRegardlessOfBatchSize() {
-        for (Scenario scenario : new Scenario[] {Scenario.THIN_BOOK, Scenario.WORST_CASE_CROSS}) {
+        for (Scenario scenario : new Scenario[] {Scenario.THIN_BOOK, Scenario.DEEP_SWEEP_CROSS}) {
             List<Order> small = collectAll(scenario, 123, 10_000, 1_000);
             List<Order> large = collectAll(scenario, 123, 10_000, 100_000);
             assertEquals(small.size(), large.size());
@@ -141,9 +205,9 @@ class WorkloadGeneratorTest {
     }
 
     @Test
-    @DisplayName("WorstCaseCross의 단일 taker가 여러 가격대를 sweep한다")
-    void worstCaseCrossSweepsMultiplePriceLevels() {
-        WorkloadGenerator g = new WorkloadGenerator(Scenario.WORST_CASE_CROSS, 99, 3_003);
+    @DisplayName("DeepSweepCross의 단일 taker가 여러 가격대를 sweep한다")
+    void deepSweepCrossSweepsMultiplePriceLevels() {
+        WorkloadGenerator g = new WorkloadGenerator(Scenario.DEEP_SWEEP_CROSS, 99, 3_003);
         MatchingEngine engine = new MatchingEngine();
         int maxTradesForOneOrder = 0;
         boolean crossedMultiplePrices = false;
