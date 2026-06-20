@@ -11,10 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.function.ToDoubleFunction;
+import java.util.stream.Collectors;
 
 /**
  * 자체 벤치마크 러너. rust-engine 하니스 {@code main.rs}를 포팅하고, 여기에 JVM 병목/리소스 진단
@@ -405,6 +407,49 @@ public final class BenchRunner {
                 displayOptional(m.avgRssKb()));
     }
 
+    // --- CLI 인자 파싱 ---
+
+    /** {@code argList}에서 {@code flagPrefix}로 시작하는 항목의 값을 찾는다. 없으면 {@code null}. 중복 지정 시 마지막 값. */
+    static String parseArgValue(List<String> argList, String flagPrefix) {
+        String value = null;
+        for (String arg : argList) {
+            if (arg.startsWith(flagPrefix)) {
+                value = arg.substring(flagPrefix.length());
+            }
+        }
+        return value;
+    }
+
+    /** {@code scenarioArg}가 {@code null}이면 전체 {@link #SCENARIOS}, 아니면 해당 시나리오 하나만. */
+    static Scenario[] selectScenarios(String scenarioArg) {
+        if (scenarioArg == null) {
+            return SCENARIOS;
+        }
+        try {
+            return new Scenario[] {Scenario.fromLabel(scenarioArg)};
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("unknown scenario '" + scenarioArg + "'. valid: "
+                    + Arrays.stream(Scenario.values()).map(Scenario::label).collect(Collectors.joining(", ")));
+        }
+    }
+
+    /** {@code scaleArg}가 {@code null}이면 전체 {@link #SCALES}, 아니면 해당 스케일 하나만. */
+    static long[] selectScales(String scaleArg) {
+        if (scaleArg == null) {
+            return SCALES;
+        }
+        long scale;
+        try {
+            scale = Long.parseLong(scaleArg);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("invalid scale '" + scaleArg + "': not a number");
+        }
+        if (scale <= 0) {
+            throw new IllegalArgumentException("invalid scale '" + scaleArg + "': must be positive");
+        }
+        return new long[] {scale};
+    }
+
     // --- 진입점 ---
 
     public static void main(String[] args) {
@@ -417,6 +462,24 @@ public final class BenchRunner {
 
         guardJitEnabled();
 
+        String scenarioArg = parseArgValue(argList, "--scenario=");
+        String scaleArg = parseArgValue(argList, "--scale=");
+        if (scaleArg != null && scenarioArg == null) {
+            System.err.println("--scale requires --scenario to also be specified");
+            System.exit(1);
+            return;
+        }
+        Scenario[] scenarios;
+        long[] scales;
+        try {
+            scenarios = selectScenarios(scenarioArg);
+            scales = selectScales(scaleArg);
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
+            return;
+        }
+
         double timerOverheadNs = measureTimerOverheadNs();
         System.out.printf(
                 "timer_overhead_ns (System.nanoTime x2 per latency sample): %.1f%n", timerOverheadNs);
@@ -428,8 +491,8 @@ public final class BenchRunner {
         List<String> csvRows = new ArrayList<>();
         csvRows.add(csvHeader());
 
-        for (Scenario scenario : SCENARIOS) {
-            for (long scale : SCALES) {
+        for (Scenario scenario : scenarios) {
+            for (long scale : scales) {
                 System.out.printf("== %s / %d ==%n", scenario.label(), scale);
                 runWarmup(scenario, warmupCountFor(scale));
 
