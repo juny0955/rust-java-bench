@@ -17,6 +17,21 @@
 
 JIT가 켜져 있어야 한다(`-Xint` 감지 시 즉시 실패). Gradle `JavaExec` 태스크라 기본적으로 JIT가 켜진다.
 
+인자 없이 실행하면 모든 시나리오 x 모든 스케일을 전부 측정한다. 특정 시나리오만,
+또는 시나리오+스케일 조합 하나만 돌리려면 `--scenario`/`--scale`을 사용한다(반복 횟수·콘솔/CSV
+출력 포맷은 동일하게 유지된다):
+
+```sh
+# ThinBook 시나리오만 (기본 스케일 1,000,000 / 10,000,000 둘 다)
+./gradlew bench --args="--scenario=ThinBook"
+
+# ThinBook / 1,000,000 조합 하나만
+./gradlew bench --args="--scenario=ThinBook --scale=1000000"
+```
+
+`--scale`은 `--scenario` 없이는 단독으로 줄 수 없다(에러 종료). 유효한 시나리오 라벨은
+아래 [워크로드](#워크로드) 절의 4가지(`ThinBook`/`ActiveFill`/`DeepSweepCross`/`BookGrowthWorst`)다.
+
 ## 워크로드
 
 `rust-engine`과 동일하다.
