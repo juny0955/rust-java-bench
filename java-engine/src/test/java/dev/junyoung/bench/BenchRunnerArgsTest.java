@@ -70,4 +70,24 @@ class BenchRunnerArgsTest {
         assertThrows(IllegalArgumentException.class, () -> BenchRunner.selectScales("0"));
         assertThrows(IllegalArgumentException.class, () -> BenchRunner.selectScales("-5"));
     }
+
+    @Test
+    @DisplayName("selectReps(null)은 기본 반복 횟수 10을 반환한다")
+    void selectRepsNullReturnsDefault() {
+        assertEquals(10, BenchRunner.selectReps(null));
+    }
+
+    @Test
+    @DisplayName("selectReps(value)는 해당 반복 횟수를 반환한다")
+    void selectRepsWithValueReturnsIt() {
+        assertEquals(3, BenchRunner.selectReps("3"));
+    }
+
+    @Test
+    @DisplayName("selectReps는 숫자가 아니거나 0 이하인 값에 예외를 던진다")
+    void selectRepsRejectsInvalidValues() {
+        assertThrows(IllegalArgumentException.class, () -> BenchRunner.selectReps("abc"));
+        assertThrows(IllegalArgumentException.class, () -> BenchRunner.selectReps("0"));
+        assertThrows(IllegalArgumentException.class, () -> BenchRunner.selectReps("-5"));
+    }
 }

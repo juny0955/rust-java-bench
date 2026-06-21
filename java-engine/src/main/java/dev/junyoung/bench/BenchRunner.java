@@ -450,6 +450,23 @@ public final class BenchRunner {
         return new long[] {scale};
     }
 
+    /** {@code repsArg}가 {@code null}이면 기본 {@link #REPS}, 아니면 해당 반복 횟수. */
+    static int selectReps(String repsArg) {
+        if (repsArg == null) {
+            return REPS;
+        }
+        int reps;
+        try {
+            reps = Integer.parseInt(repsArg);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("invalid runs '" + repsArg + "': not a number");
+        }
+        if (reps <= 0) {
+            throw new IllegalArgumentException("invalid runs '" + repsArg + "': must be positive");
+        }
+        return reps;
+    }
+
     // --- 진입점 ---
 
     public static void main(String[] args) {
@@ -464,6 +481,7 @@ public final class BenchRunner {
 
         String scenarioArg = parseArgValue(argList, "--scenario=");
         String scaleArg = parseArgValue(argList, "--scale=");
+        String repsArg = parseArgValue(argList, "--runs=");
         if (scaleArg != null && scenarioArg == null) {
             System.err.println("--scale requires --scenario to also be specified");
             System.exit(1);
@@ -471,9 +489,11 @@ public final class BenchRunner {
         }
         Scenario[] scenarios;
         long[] scales;
+        int reps;
         try {
             scenarios = selectScenarios(scenarioArg);
             scales = selectScales(scaleArg);
+            reps = selectReps(repsArg);
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
             System.exit(1);
@@ -496,8 +516,8 @@ public final class BenchRunner {
                 System.out.printf("== %s / %d ==%n", scenario.label(), scale);
                 runWarmup(scenario, warmupCountFor(scale));
 
-                List<MetricRow> runs = new ArrayList<>(REPS);
-                for (int rep = 0; rep < REPS; rep++) {
+                List<MetricRow> runs = new ArrayList<>(reps);
+                for (int rep = 0; rep < reps; rep++) {
                     long seed = 0x1234_5678_9ABC_DEF0L + rep; // long overflow = Rust wrapping_add
                     MetricRow row = runOnce(scenario, scale, seed, targetOs);
                     printRow("run_" + rep, row);
