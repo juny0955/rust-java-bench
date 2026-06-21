@@ -29,7 +29,8 @@ tasks.test {
 tasks.register<JavaExec>("bench") {
     group = "benchmark"
     description = "매칭 엔진 벤치마크 하니스 실행 (결과 CSV: build/bench-results/). " +
-        "특정 시나리오만: --args=\"--scenario=ThinBook --scale=1000000\""
+        "특정 시나리오만: --args=\"--scenario=ThinBook --scale=1000000\". " +
+        "반복 횟수 지정(기본 10): --args=\"--runs=3\""
     mainClass = "dev.junyoung.bench.BenchRunner"
     classpath = sourceSets["main"].runtimeClasspath
 }

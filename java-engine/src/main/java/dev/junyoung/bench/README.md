@@ -18,8 +18,8 @@
 JIT가 켜져 있어야 한다(`-Xint` 감지 시 즉시 실패). Gradle `JavaExec` 태스크라 기본적으로 JIT가 켜진다.
 
 인자 없이 실행하면 모든 시나리오 x 모든 스케일을 전부 측정한다. 특정 시나리오만,
-또는 시나리오+스케일 조합 하나만 돌리려면 `--scenario`/`--scale`을 사용한다(반복 횟수·콘솔/CSV
-출력 포맷은 동일하게 유지된다):
+또는 시나리오+스케일 조합 하나만 돌리려면 `--scenario`/`--scale`을 사용한다(콘솔/CSV
+출력 포맷은 동일하게 유지된다). 반복 횟수는 기본 10회이며 `--runs`로 조정할 수 있다:
 
 ```sh
 # ThinBook 시나리오만 (기본 스케일 1,000,000 / 10,000,000 둘 다)
@@ -27,10 +27,14 @@ JIT가 켜져 있어야 한다(`-Xint` 감지 시 즉시 실패). Gradle `JavaEx
 
 # ThinBook / 1,000,000 조합 하나만
 ./gradlew bench --args="--scenario=ThinBook --scale=1000000"
+
+# ThinBook / 1,000,000, 3회만 반복
+./gradlew bench --args="--scenario=ThinBook --scale=1000000 --runs=3"
 ```
 
-`--scale`은 `--scenario` 없이는 단독으로 줄 수 없다(에러 종료). 유효한 시나리오 라벨은
-아래 [워크로드](#워크로드) 절의 4가지(`ThinBook`/`ActiveFill`/`DeepSweepCross`/`BookGrowthWorst`)다.
+`--scale`은 `--scenario` 없이는 단독으로 줄 수 없다(에러 종료). `--runs`는 시나리오/스케일
+선택과 독립적으로 단독 사용 가능하며, 1 이상의 정수가 아니면 에러 종료한다. 유효한 시나리오
+라벨은 아래 [워크로드](#워크로드) 절의 4가지(`ThinBook`/`ActiveFill`/`DeepSweepCross`/`BookGrowthWorst`)다.
 
 ## 워크로드
 
@@ -45,7 +49,7 @@ JIT가 켜져 있어야 한다(`-Xint` 감지 시 즉시 실패). Gradle `JavaEx
   키우는 memory-pressure worst case를 본다. **seed를 사용하지 않는 완전 결정적** 워크로드이며 체결되지
   않는다.
 
-각 시나리오는 1,000,000 / 10,000,000 스케일에서 10회 반복하며, 측정 전 스케일 비례
+각 시나리오는 1,000,000 / 10,000,000 스케일에서 기본 10회(`--runs`로 조정 가능) 반복하며, 측정 전 스케일 비례
 (`max(scale/10, 10,000)`) 워밍업 pass를 수행한다. 고정 1-pass 워밍업으로는 JVM JIT가 C2까지
 컴파일을 끝내지 못해 `run_0`/`run_1`의 ops_sec이 낮고 불안정해지는 문제가 있어, 같은 크기의
 워밍업 pass를 **적응형으로 반복**한다: `CompilationMXBean`의 누적 컴파일 시간 델타가 연속 2회
@@ -93,7 +97,8 @@ latency_sample_count,latency_sample_stride,baseline_rss_kb,peak_rss_kb,avg_rss_k
 target_os,gc_count,gc_time_ms,jit_compile_ms,alloc_bytes,heap_used_peak_kb,heap_used_avg_kb
 ```
 
-- `row_type`: `run_0`..`run_9`, `mean`, `stddev`. `stddev`는 모표준편차(분모 n=10).
+- `row_type`: `run_0`..`run_{N-1}`(`N`은 `--runs`로 지정한 반복 횟수, 기본 10), `mean`, `stddev`.
+  `stddev`는 모표준편차(분모 n=N).
 - `baseline_rss_kb`/`peak_rss_kb`/`avg_rss_kb`/`rss_supported`: Linux 전용, 그 외 빈 값/`false`.
 - `target_os`: `macos`/`linux`/`windows`로 정규화(Rust 의미와 맞춤).
 
