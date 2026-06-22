@@ -1,33 +1,24 @@
 package dev.junyoung;
 
-import it.unimi.dsi.fastutil.longs.Long2ObjectRBTreeMap;
 import java.util.ArrayDeque;
+import java.util.TreeMap;
 
 /**
  * 호가창. rust-engine의 {@code OrderBook}과 동일하다.
  *
- * <p>양측을 {@code Long2ObjectRBTreeMap<ArrayDeque<Order>>}로 보관한다.
+ * <p>양측을 {@code TreeMap<Long, ArrayDeque<Order>>}로 보관한다.
  * 가격 키는 오름차순 정렬되며(가격 우선), 동일 가격대 내에서는 {@code ArrayDeque}의
  * 삽입 순서(FIFO, 시간 우선)를 따른다. 매수 최우선은 최고가({@code lastEntry}),
  * 매도 최우선은 최저가({@code firstEntry})다.
  */
 public final class OrderBook {
-
-    private final Long2ObjectRBTreeMap<ArrayDeque<Order>> bids =
-        new Long2ObjectRBTreeMap<>();
-    private final Long2ObjectRBTreeMap<ArrayDeque<Order>> asks =
-        new Long2ObjectRBTreeMap<>();
+    private final TreeMap<Long, ArrayDeque<Order>> bids = new TreeMap<>();
+    private final TreeMap<Long, ArrayDeque<Order>> asks = new TreeMap<>();
 
     public void insert(Order order) {
-        Long2ObjectRBTreeMap<ArrayDeque<Order>> map = sideMap(order.side);
-
-        ArrayDeque<Order> level = map.get(order.price);
-        if (level == null) {
-            level = new ArrayDeque<>();
-            map.put(order.price, level);
-        }
-
-        level.addLast(order);
+        sideMap(order.side)
+                .computeIfAbsent(order.price, k -> new ArrayDeque<>())
+                .addLast(order);
     }
 
     /**
@@ -45,7 +36,7 @@ public final class OrderBook {
      * 해당 측이 비어 있으면 {@code null}. (rust-engine의 {@code poll_best}에 대응.)
      */
     public Order pollBest(Side side) {
-        Long2ObjectRBTreeMap<ArrayDeque<Order>> map = sideMap(side);
+        TreeMap<Long, ArrayDeque<Order>> map = sideMap(side);
         if (map.isEmpty()) {
             return null;
         }
@@ -59,21 +50,18 @@ public final class OrderBook {
     }
 
     private ArrayDeque<Order> bestLevel(Side side) {
-        Long2ObjectRBTreeMap<ArrayDeque<Order>> map = sideMap(side);
+        TreeMap<Long, ArrayDeque<Order>> map = sideMap(side);
         if (map.isEmpty()) {
             return null;
         }
         return map.get(bestPrice(side, map));
     }
 
-    private long bestPrice(
-        Side side,
-        Long2ObjectRBTreeMap<ArrayDeque<Order>> map
-    ) {
-        return side == Side.BUY ? map.lastLongKey() : map.firstLongKey();
+    private long bestPrice(Side side, TreeMap<Long, ArrayDeque<Order>> map) {
+        return side == Side.BUY ? map.lastKey() : map.firstKey();
     }
 
-    private Long2ObjectRBTreeMap<ArrayDeque<Order>> sideMap(Side side) {
+    private TreeMap<Long, ArrayDeque<Order>> sideMap(Side side) {
         return side == Side.BUY ? bids : asks;
     }
 }
