@@ -2,7 +2,6 @@ package dev.junyoung;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectRBTreeMap;
 import java.util.ArrayDeque;
-import java.util.function.LongFunction;
 
 /**
  * 호가창. rust-engine의 {@code OrderBook}과 동일하다.
@@ -13,13 +12,22 @@ import java.util.function.LongFunction;
  * 매도 최우선은 최저가({@code firstEntry})다.
  */
 public final class OrderBook {
-    private final Long2ObjectRBTreeMap<ArrayDeque<Order>> bids = new Long2ObjectRBTreeMap<>();
-    private final Long2ObjectRBTreeMap<ArrayDeque<Order>> asks = new Long2ObjectRBTreeMap<>();
+
+    private final Long2ObjectRBTreeMap<ArrayDeque<Order>> bids =
+        new Long2ObjectRBTreeMap<>();
+    private final Long2ObjectRBTreeMap<ArrayDeque<Order>> asks =
+        new Long2ObjectRBTreeMap<>();
 
     public void insert(Order order) {
-        sideMap(order.side)
-                .computeIfAbsent(order.price, (LongFunction<ArrayDeque<Order>>) k -> new ArrayDeque<>())
-                .addLast(order);
+        Long2ObjectRBTreeMap<ArrayDeque<Order>> map = sideMap(order.side);
+
+        ArrayDeque<Order> level = map.get(order.price);
+        if (level == null) {
+            level = new ArrayDeque<>();
+            map.put(order.price, level);
+        }
+
+        level.addLast(order);
     }
 
     /**
@@ -58,7 +66,10 @@ public final class OrderBook {
         return map.get(bestPrice(side, map));
     }
 
-    private long bestPrice(Side side, Long2ObjectRBTreeMap<ArrayDeque<Order>> map) {
+    private long bestPrice(
+        Side side,
+        Long2ObjectRBTreeMap<ArrayDeque<Order>> map
+    ) {
         return side == Side.BUY ? map.lastLongKey() : map.firstLongKey();
     }
 
